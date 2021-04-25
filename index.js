@@ -1,5 +1,9 @@
 /* @flow */
 import * as FileSystem from 'expo-file-system';
+import * as SecureStore from 'expo-secure-store';
+import CryptoJSCore from 'crypto-js/core';
+import AES from 'crypto-js/aes';
+import uuidv4 from 'uuid/v4';
 
 export const DocumentDir = FileSystem.documentDirectory;
 export const CacheDir = FileSystem.cacheDirectory;
@@ -31,6 +35,7 @@ async function withCallback<R>(
   }
 }
 
+let encryptionKey = null;
 const FSStorage = (
   location?: string = DocumentDir,
   folder?: string = 'reduxPersist',
@@ -40,19 +45,48 @@ const FSStorage = (
   const pathForKey = (key: string) =>
     resolvePath(baseFolder, encodeURIComponent(key));
 
+  const getEncryptionKey = async () => {
+    try {
+      if (encryptionKey == null) {
+        let encryptionKeyValue = await SecureStore.getItemAsync('expoFsSecureEncryptionKey');
+
+        if (!encryptionKeyValue) {
+          encryptionKeyValue = uuidv4();
+          await SecureStore.setItemAsync('expoFsSecureEncryptionKey', encryptionKeyValue);
+        }
+
+        encryptionKey = encryptionKeyValue;
+      }
+
+      return encryptionKey;
+    } catch (err) {
+      throw new Error(`Error getting encryption key ${err.message}`);
+    }
+  };
+
   const setItem = (
     key: string,
     value: string,
     callback?: ?(error: ?Error) => void,
   ): Promise<void> =>
     withCallback(callback, async () => {
-      const { exists } = await FileSystem.getInfoAsync(baseFolder);
-      if (exists == false) {
-        await FileSystem.makeDirectoryAsync(baseFolder, {
-          intermediates: true,
-        });
+      try {
+        const { exists } = await FileSystem.getInfoAsync(baseFolder);
+
+        if (exists == false) {
+          await FileSystem.makeDirectoryAsync(baseFolder, {
+            intermediates: true
+          });
+        }
+
+        let encryptedValue = value;
+        const secretKey = await getEncryptionKey();
+
+        encryptedValue = AES.encrypt(value, secretKey).toString();
+        await FileSystem.writeAsStringAsync(pathForKey(key), encryptedValue);
+      } catch (err) {
+        throw new Error(`Error setting item: ${err.message}`);
       }
-      await FileSystem.writeAsStringAsync(pathForKey(key), value);
     });
 
   const getItem = (
@@ -62,8 +96,25 @@ const FSStorage = (
     withCallback(callback, async () => {
       const pathKey = pathForKey(key);
       const { exists } = await FileSystem.getInfoAsync(pathKey);
+
       if (exists) {
-        return await FileSystem.readAsStringAsync(pathKey);
+        try {
+          let decryptedString = "{}";
+          const encryptedValue = await FileSystem.readAsStringAsync(pathKey);
+
+          try {
+            const secretKey = await getEncryptionKey();
+            const bytes = AES.decrypt(encryptedValue, secretKey);
+
+            decryptedString = bytes.toString(CryptoJSCore.enc.Utf8);
+          } catch (err) {
+            throw new Error(`Could not decrypt state: ${err.message}`);
+          }
+
+          return decryptedString;
+        } catch (err) {
+          throw new Error(`Error getting item: ${err.message}`);
+        }
       }
     });
 

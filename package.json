@@ -1,15 +1,16 @@
 {
-  "name": "redux-persist-expo-fs-storage",
-  "version": "2.1.0",
-  "description": "Redux-Persist storage engine for Expo file system",
-  "repository": "https://github.com/nohac/redux-persist-expo-fs-storage",
+  "name": "redux-persist-expo-fs-secure-storage",
+  "version": "0.0.1",
+  "description": "Redux-Persist secure storage engine for Expo file system",
+  "repository": "https://://github.com/mattmcginnis/redux-persist-expo-fs-secure-storage",
   "author": "Jonas Rudlang <jonas.rudlang@gmail.com>",
   "license": "MIT",
   "keywords": [
     "redux",
     "redux-persist",
     "storage",
-    "AsyncStorage"
+    "AsyncStorage",
+    "secure"
   ],
   "main": "lib/index.js",
   "files": [
@@ -27,13 +28,18 @@
     "prettier": "2.1.2"
   },
   "peerDependencies": {
-    "react": "^16.13.1",
-    "react-native": ">=0.63.3",
-    "expo-file-system": "^9.2.0"
+    "expo-file-system": "~9.3.0",
+    "expo-secure-store": "~9.3.0",
+    "react": "*",
+    "react-native": "*"
   },
   "prettier": {
     "singleQuote": true,
     "trailingComma": "all",
     "parser": "flow"
+  },
+  "dependencies": {
+    "crypto-js": "^3.1.9-1",
+    "uuid": "^3.3.2"
   }
 }
